@@ -33,7 +33,91 @@ We will load the following data to our session:\
 \* Sample of the grid used by the FishMIP models  
   
 ```{r}
-ccamlr <- read_sf("../../SO_shapefiles/CCAMLR_Convention_Area/asd-shapefile-WGS84.shp")
-measo <- measo_regions05_ll_coastline
+#CCAMLR boundaries
+ccamlr <- read_sf("../../SO_shapefiles/CCAMLR_Convention_Area/statistical_areasPolygon_wgs84.shp")
+
+#MEASO boundaries
+measo <- measo_regions05_ll |> 
+  #Removing "temperate" regions as they are not relevant for SOMEME
+  filter(str_detect(name, "T$", negate = T)) |> 
+  #Recreating CRS as per warning
+  st_set_crs(4326)|>
+  #Add new column with unique ID identifying each MEASO area
+  mutate(id = as.numeric(as.factor(name)))
+
+#FishMIP models
+fishmip <- rast("../../SO_shapefiles/area_1deg.nc")
+```
+
+## Creating raster masks
+We will use unique IDs to identify each region in the raster mask, so after creating the mask, we will also store a file that will help us identify each region.    
+  
+```{r}
+#| eval: false
+#Ensure an "outputs" folder exists
+out_folder <- "../outputs"
+if(dir.exists(out_folder) == F){
+  dir.create(out_folder)
+}
+
+#Rasterise CCAMLR shapefile
+ccamlr_ras <- rasterize(ccamlr, fishmip, field = "GAR_Short_", touches = T,
+                        fun = "min", background = NA)
+#Saving raster
+writeCDF(ccamlr_ras, file.path(out_folder, "ccamlr_stats_area_1deg.nc"),
+         overwrite = T, varname = "ccamlr", longname = "ccamlr stats areas",
+         missval = NA)
+
+#Get keys to interpret mask
+ccamlr |> 
+  st_drop_geometry() |> 
+  select(GAR_Name, GAR_Short_) |> 
+  write_csv(file.path(out_folder, "ccamlr_stats_area_keys.csv"))
+
+
+#Rasterise MEASO boundaries
+measo_ras <- rasterize(measo, fishmip, field = "id", touches = T, 
+                       fun = "min", background = NA)
+
+#Saving raster
+writeCDF(measo_ras, file.path(out_folder, "measo_regions_1deg.nc"),
+         overwrite = T, varname = "measo", longname = "measo regions",
+         missval = NA)
+
+#Get keys to interpret mask
+measo |> 
+  st_drop_geometry() |> 
+  write_csv(file.path(out_folder, "measo_regions_keys.csv"))
+```
+  
+## Creating data frame masks
+Using the raster masks created above, we will create the data frame masks. We will also add the area of the grid cells to allow for easy calculation of weighted means by area.  
+  
+```{r}
+#| eval: false
+#Transforming sample raster to data frame
+fishmip_df <- fishmip |> 
+  as.data.frame(xy = T)
+
+#Transforming CCAMLR raster mask
+ccamlr_df <- ccamlr_ras |> 
+  as.data.frame(xy = T) |> 
+  #Add area of grid cells
+  left_join(fishmip_df, by = join_by(x, y))
+
+#Saving data frame mask
+ccamlr_df |> 
+  write_csv(file.path(out_folder, "ccamlr_stats_area_1deg.csv"))
+
+
+#Transforming MEASO raster mask
+measo_df <- measo_ras |> 
+  as.data.frame(xy = T) |> 
+  #Add area of grid cells
+  left_join(fishmip_df, by = join_by(x, y))
+
+#Saving data frame mask
+measo_df |> 
+  write_csv(file.path(out_folder, "measo_regions_1deg.csv"))
 ```
 
