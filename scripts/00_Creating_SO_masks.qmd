@@ -4,12 +4,13 @@ author: "Denisse Fierro Arcos"
 date: "2020-02-19"
 format: gfm
 toc: true
-editor: visual
+editor: source
 ---
 
 # Creating masks to extract data for the Southern Ocean
-We will create two types of masks: a raster (gridded) mask that can be used to extract data from `netcdf` files, and a data frame mask that can be used to extract data from a data frame.  
-  
+
+We will create two types of masks: a raster (gridded) mask that can be used to extract data from `netcdf` files, and a data frame mask that can be used to extract data from a data frame.
+
 ## Loading libraries
 
 ```{r}
@@ -25,16 +26,17 @@ library(tidyverse)
 #Base map
 library(rnaturalearth)
 ```
-  
+
 ## Loading data
+
 We will load the following data to our session:\
 \* Boundaries for the [Commission for the Conservation of Marine Antarctic Living Resources (CCAMLR) Convention Areas](https://www.ccamlr.org/en/organisation/convention-area), which can be downloaded from the [CCAMLR GIS portal](https://gis.ccamlr.org/)\
-\* Marine Ecosystem Assessment for the Southern Ocean boundaries from the [`measoshapes` R package](https://github.com/AustralianAntarcticDivision/measoshapes)  
-\* Sample of the grid used by the FishMIP models  
-  
+\* Marine Ecosystem Assessment for the Southern Ocean boundaries from the [`measoshapes` R package](https://github.com/AustralianAntarcticDivision/measoshapes)\
+\* Sample of the grid used by the FishMIP models
+
 ```{r}
 #CCAMLR boundaries
-ccamlr <- read_sf("../../SO_shapefiles/CCAMLR_Convention_Area/statistical_areasPolygon_wgs84.shp")
+ccamlr <- read_sf("../../SO_shapefiles/CCAMLR_MPA_Planning_Domains/CCAMLR_MPA_Planning_Domains_wgs84.shp")
 
 #MEASO boundaries
 measo <- measo_regions05_ll |> 
@@ -50,8 +52,9 @@ fishmip <- rast("../../SO_shapefiles/area_1deg.nc")
 ```
 
 ## Creating raster masks
-We will use unique IDs to identify each region in the raster mask, so after creating the mask, we will also store a file that will help us identify each region.    
-  
+
+We will use unique IDs to identify each region in the raster mask, so after creating the mask, we will also store a file that will help us identify each region.
+
 ```{r}
 #| eval: false
 #Ensure an "outputs" folder exists
@@ -61,18 +64,18 @@ if(dir.exists(out_folder) == F){
 }
 
 #Rasterise CCAMLR shapefile
-ccamlr_ras <- rasterize(ccamlr, fishmip, field = "GAR_Short_", touches = T,
+ccamlr_ras <- rasterize(ccamlr, fishmip, field = "Name", touches = T,
                         fun = "min", background = NA)
 #Saving raster
-writeCDF(ccamlr_ras, file.path(out_folder, "ccamlr_stats_area_1deg.nc"),
-         overwrite = T, varname = "ccamlr", longname = "ccamlr stats areas",
+writeCDF(ccamlr_ras, file.path(out_folder, "ccamlr_mpa_planning_1deg.nc"),
+         overwrite = T, varname = "ccamlr", 
+         longname = "ccamlr mpa planning domains",
          missval = NA)
 
 #Get keys to interpret mask
 ccamlr |> 
   st_drop_geometry() |> 
-  select(GAR_Name, GAR_Short_) |> 
-  write_csv(file.path(out_folder, "ccamlr_stats_area_keys.csv"))
+  write_csv(file.path(out_folder, "ccamlr_mpa_planning_keys.csv"))
 
 
 #Rasterise MEASO boundaries
@@ -89,10 +92,11 @@ measo |>
   st_drop_geometry() |> 
   write_csv(file.path(out_folder, "measo_regions_keys.csv"))
 ```
-  
+
 ## Creating data frame masks
-Using the raster masks created above, we will create the data frame masks. We will also add the area of the grid cells to allow for easy calculation of weighted means by area.  
-  
+
+Using the raster masks created above, we will create the data frame masks. We will also add the area of the grid cells to allow for easy calculation of weighted means by area.
+
 ```{r}
 #| eval: false
 #Transforming sample raster to data frame
@@ -107,7 +111,7 @@ ccamlr_df <- ccamlr_ras |>
 
 #Saving data frame mask
 ccamlr_df |> 
-  write_csv(file.path(out_folder, "ccamlr_stats_area_1deg.csv"))
+  write_csv(file.path(out_folder, "ccamlr_mpa_planning_1deg.csv"))
 
 
 #Transforming MEASO raster mask
@@ -120,4 +124,3 @@ measo_df <- measo_ras |>
 measo_df |> 
   write_csv(file.path(out_folder, "measo_regions_1deg.csv"))
 ```
-
