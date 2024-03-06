@@ -4,13 +4,13 @@ author: "Denisse Fierro Arcos"
 date: "2024-02-19"
 format: gfm
 toc: true
-editor: visual
+editor: source
 ---
 
 # Changes in total consumer biomass in the Southern Ocean
 
-In this notebook, we will use all FishMIP global models to calculate the mean ensemble percentage change in total exploitable fish biomass in the Southern Ocean for the decade ending in 2050. The reference period for this calculation is 2005-2014. We define "exploitable fish biomass" as biomass for all marine organisms with weights between 10g and 100Kg.  
-  
+In this notebook, we will use all FishMIP global models to calculate the mean ensemble percentage change in total consumer biomass in the Southern Ocean for the decade ending in 2100. The reference period for this calculation is 2005-2014. Total consumer biomass includes all consumers (vertebrates and invertebrates) with trophic level above 1.
+
 ## Loading libraries
 
 ```{r}
@@ -35,11 +35,12 @@ library(cowplot)
 ```
 
 ## Setting up notebook
-We will define the folders where inputs are kept, and where outputs should be saved.  
-  
+
+We will define the folders where inputs are kept, and where outputs should be saved.
+
 ```{r}
 #Base folder for project
-base_folder <- "/rd/gem/private/users/camillan"
+base_folder <- "/rd/gem/public/fishmip/SOMEME/"
 
 #Defining location of notebook outputs
 out_folder <- "../outputs"
@@ -47,63 +48,94 @@ if(!dir.exists(out_folder)){
   dir.create(out_folder)
 }
 ```
-  
+
 ## Loading data
-We will load the total consumer biomass data to calculate percentage change, and masks to extract data for the MEASO and CCAMLR regions only.  
-  
+
+We will load the total consumer biomass data to calculate percentage change, and masks to extract data for the MEASO and CCAMLR regions only.
+
 ```{r}
 #MEASO
 measo_mask <- read_csv("../outputs/measo_regions_1deg.csv")
 measo_keys <- read_csv("../outputs/measo_regions_keys.csv")
 
 #CCAMLR
-ccamlr_mask <- read_csv("../outputs/ccamlr_stats_area_1deg.csv")
-ccamlr_keys <- read_csv("../outputs/ccamlr_stats_area_keys.csv")
+ccamlr_mask <- read_csv("../outputs/ccamlr_mpa_planning_1deg.csv")
+ccamlr_keys <- read_csv("../outputs/ccamlr_mpa_planning_keys.csv")
 
 #Joining MEASO and CCAMLR masks into a single data frame
 measo_ccamlr <- full_join(measo_mask, ccamlr_mask, 
                           by = join_by(x, y, area_m)) |> 
   #Rename ID columns
-  rename("measo"="id", "ccamlr"="GAR_Short_")
+  rename("measo"="id", "ccamlr"="Name")
 
-#Getting a list of files containing biomass data
-global_files <- list.files(base_folder, pattern = "global_10g-100kg.rds", 
+#Getting a list of files containing total consumer biomass data
+global_files <- list.files(base_folder, full.names = T, recursive = T) |> 
+  #Keeping only experiments of interest
+  str_subset("nat_default") |> 
+  #Removing "picontrol" experiment
+  str_subset("picontrol", negate = T)
+```
+
+## Calculating percentage change in fish biomass estimates from global FishMIP models
+
+We will go through each FishMIP model and calculate the mean fish biomass for the decade between 2005 and 2014 (last decade of `historical` period), and for the period between 2091 and 2100 (for the two emission scenarios). Finally, we will calculate the percentage change between these two decades.
+
+```{r, eval = F}
+#Looping through each file
+for(f in global_files){
+  #Getting name of model and scenario
+  mem <- str_extract(basename(f), "^(.*)-(c|e)", group = 1)
+  scenario <- str_extract(f, "nobasd_(.*)_nat", group = 1)
+  #Loading file
+  df <- read_csv(f, col_select = time:tcb) |> 
+    mutate(year = year(time)) |> 
+    #Extract data only for years to be used in maps
+    filter(year >= 2005 & year <= 2014 | year >= 2091 & year <= 2100) |> 
+    #Create new group column to calculate means
+    mutate(group = case_when(year <= 2014 ~ "reference",
+                             year >= 2091 & year <= 2100 ~ "mean00"),
+           scenario = scenario,
+           #The new group column also need to have the scenario as part of the label
+           group = case_when(group != "reference" ~ 
+                               str_c(group, scenario, sep = "_"),
+                             T ~ group),
+           mem = mem) |> 
+    separate_wider_delim(mem, delim = "_", names = c("mem", "esm")) |> 
+    group_by(lat, lon, mem, esm, group) |> 
+    summarise(mean_bio = mean(tcb, na.rm = T)) |> 
+    ungroup()
+  
+  #Path to save file
+  f_out <- file.path(out_folder,
+                     paste0(mem, "_gridded_mean_", scenario, ".csv"))
+  
+  #Saving results for each model
+  df |> 
+    fwrite(f_out)
+}
+```
+
+```{r}
+#Getting a list of files containing total consumer biomass data
+global_files <- list.files(out_folder, "gridded_mean",
                            full.names = T, recursive = T)
 
 #Getting a list of models
-members <- str_extract(global_files, "annual_(.*)_(h|s)", group = 1) |> 
+members <- basename(global_files) |> 
+  str_extract("^(.*)_gridded", group = 1) |> 
   unique()
-```
-  
-## Calculating percentage change in fish biomass estimates from global FishMIP models
-We will go through each FishMIP model and calculate the mean fish biomass for the decade between 2005 and 2014 (last decade of `historical` period), and for the period between 2041 and 2050 (for the two emission scenarios). Finally, we will calculate the percentage change between these two decades.  
-  
-```{r, eval = F}
-#Looping through each FishMIP model
+
+#Loading data for each model
 for(m in members){
   #Load all data available for a single FishMIP model
   df_model <- str_subset(global_files, m) |> 
-    map(~readRDS(.)) |> 
+    map(~read_csv(.)) |> 
     map_df(~bind_rows(.)) |> 
-    #Extract values for Southern Ocean only
-    filter(y < -35) |> 
-    #Extract data only for years to be used in maps
-    filter(year >= 2005 & year <= 2014 | year >= 2041 & year <= 2050) |> 
-    #Create new group column to calculate means
-    mutate(group = case_when(year <= 2014 ~ "reference",
-                             year >= 2041 & year <= 2050 ~ "mean50"),
-           #The new group column also need to have the scenario as part of the label
-           group = case_when(group != "reference" ~ str_c(group, scenario, sep = "_"),
-                             T ~ group)) |> 
-    #Calculate mean per ensemble member
-    group_by(x, y, mem, esm, group) |> 
-    summarise(mean_bio = mean(biomass, na.rm = T)) |> 
     #Reorganise table to facilitate calculations
     pivot_wider(names_from = group, values_from = mean_bio) |> 
-    ungroup() |> 
     #Calculate % change in fish biomass for the two emissions scenarios
-    mutate(rel_change_mean50_ssp126 = ((mean50_ssp126-reference)/reference)*100,
-           rel_change_mean50_ssp585 = ((mean50_ssp585-reference)/reference)*100)
+    mutate(rel_change_mean00_ssp126 = ((mean00_ssp126-reference)/reference)*100,
+           rel_change_mean00_ssp585 = ((mean00_ssp585-reference)/reference)*100)
    
   #Create name to save file  
   f_out <- file.path(out_folder, str_c(m, "_perc_bio_change_data_map.csv"))
@@ -113,10 +145,11 @@ for(m in members){
     fwrite(f_out)
 }
 ```
-  
+
 ### Calculating ensemble mean and standard deviation
-We will now load the percentage change in biomass for all global models and calculate an ensemble mean and standard deviation.  
-  
+
+We will now load the percentage change in biomass for all global models and calculate an ensemble mean and standard deviation.
+
 ```{r}
 #Listing all relevant files to calculate biomass projections
 maps_data <- list.files(out_folder, pattern = "_perc_bio_change_data_map.csv", 
@@ -134,9 +167,9 @@ maps_data <- list.files(out_folder, pattern = "_perc_bio_change_data_map.csv",
   #Apply mask
   left_join(measo_ccamlr, by = join_by(x, y))
 ```
-  
+
 ## World base map
-  
+
 ```{r}
 #South Polar Stereographic projection
 sp_proj <- "+proj=laea +lat_0=-90 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +type=crs"
@@ -147,8 +180,9 @@ world_proj <- ne_countries(returnclass = "sf") |>
 ```
 
 ## Plotting exploitable fish biomass
-We will use the masks to create plots using the MEASO and CCAMLR boundaries, but first we will define a colourmap to be used in all maps, and the basic plotting instructions.  
-  
+
+We will use the masks to create plots using the MEASO and CCAMLR boundaries, but first we will define a colourmap to be used in all maps, and the basic plotting instructions.
+
 ```{r}
 #Create custom-made color palette
 scale_fill_custom <- function(..., alpha = 1, begin = 0, end = 1, direction = 1, 
@@ -164,9 +198,9 @@ scale_fill_custom <- function(..., alpha = 1, begin = 0, end = 1, direction = 1,
     na.value = na.value, guide = guide, ...)
 }
 ```
-  
+
 ### CCAMLR plots
-  
+
 ```{r}
 #Loading CCAMLR boundaries
 ccamlr <- read_sf("../../SO_shapefiles/CCAMLR_Convention_Area/statistical_areasPolygon.shp") |> 
@@ -197,9 +231,9 @@ base_gg_perc <- list(scale_fill_binned(limits = c(-50, 50), n.breaks = 8,
                       plot.title = element_text(hjust = 0.5),
                       legend.position = "none"))
 ```
-    
-We can now plot mean percentage change in fish biomass for the FishMIP ensemble within the CCAMLR boundaries.  
-  
+
+We can now plot mean percentage change in fish biomass for the FishMIP ensemble within the CCAMLR boundaries.
+
 ```{r}
 #Mean percentage change
 #SSP1-2.6 2041-2050
@@ -239,17 +273,17 @@ all_plots <- plot_grid(title, plot_grid(p50_126, p50_585, ncol = 2, nrow = 1,
 #Check final map
 all_plots
 ```
-  
+
 We can save the plot as a pdf.
-  
+
 ```{r}
 # Saving multi-panel plot
 ggsave(file.path(out_folder, "so_perc_change_map_50s_ccamlr.pdf"), 
        device = "pdf", width = 9, height = 6)
 ```
-  
-We can plot the standard deviation for the percentage change across all FishMIP models.  
-  
+
+We can plot the standard deviation for the percentage change across all FishMIP models.
+
 ```{r}
 #Define base steps for maps
 base_gg_sd <- list(scale_fill_distiller(palette = "Blues", direction = 1, 
@@ -265,7 +299,7 @@ base_gg_sd <- list(scale_fill_distiller(palette = "Blues", direction = 1,
                       plot.title = element_text(hjust = 0.5),
                       legend.position = "none"))
 ```
-  
+
 ```{r}
 #Standard deviation
 #SSP1-2.6 2041-2050
@@ -305,9 +339,9 @@ all_plots <- plot_grid(title, plot_grid(p50_126, p50_585, ncol = 2, nrow = 1,
 #Check final map
 all_plots
 ```
-  
+
 We can save the plot as a pdf.
-  
+
 ```{r}
 # Saving multi-panel plot
 ggsave(file.path(out_folder, "so_sd_map_50s_ccamlr.pdf"), 
@@ -315,7 +349,7 @@ ggsave(file.path(out_folder, "so_sd_map_50s_ccamlr.pdf"),
 ```
 
 ### MEASO plots
-  
+
 ```{r}
 #Loading CCAMLR boundaries
 measo <- measo_regions05_coastline |> 
@@ -346,9 +380,9 @@ base_gg_perc <- list(scale_fill_binned(limits = c(-50, 50), n.breaks = 8,
                       plot.title = element_text(hjust = 0.5),
                       legend.position = "none"))
 ```
-    
-We can now plot mean percentage change in fish biomass for the FishMIP ensemble within the MEASO boundaries.  
-  
+
+We can now plot mean percentage change in fish biomass for the FishMIP ensemble within the MEASO boundaries.
+
 ```{r}
 #Mean percentage change
 #SSP1-2.6 2041-2050
@@ -388,17 +422,17 @@ all_plots <- plot_grid(title, plot_grid(p50_126, p50_585, ncol = 2, nrow = 1,
 #Check final map
 all_plots
 ```
-  
+
 We can save the plot as a pdf.
-  
+
 ```{r}
 # Saving multi-panel plot
 ggsave(file.path(out_folder, "so_perc_change_map_50s_measo.pdf"), 
        device = "pdf", width = 9, height = 6)
 ```
-  
-We can plot the standard deviation for the percentage change across all FishMIP models.  
-  
+
+We can plot the standard deviation for the percentage change across all FishMIP models.
+
 ```{r}
 #Define base steps for maps
 base_gg_sd <- list(scale_fill_distiller(palette = "Blues", direction = 1, 
@@ -414,7 +448,7 @@ base_gg_sd <- list(scale_fill_distiller(palette = "Blues", direction = 1,
                       plot.title = element_text(hjust = 0.5),
                       legend.position = "none"))
 ```
-  
+
 ```{r}
 #Standard deviation
 #SSP1-2.6 2041-2050
@@ -454,12 +488,11 @@ all_plots <- plot_grid(title, plot_grid(p50_126, p50_585, ncol = 2, nrow = 1,
 #Check final map
 all_plots
 ```
-  
+
 We can save the plot as a pdf.
-  
+
 ```{r}
 # Saving multi-panel plot
 ggsave(file.path(out_folder, "so_sd_map_50s_measo.pdf"), 
        device = "pdf", width = 9, height = 6)
 ```
-  
