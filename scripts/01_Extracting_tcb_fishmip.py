@@ -31,12 +31,18 @@ for f in list_files:
   attrs = pd.DataFrame(data = ds.attrs, index = [0])
   #Extract data for the Southern Ocean (30-90S)
   ds = ds.sel(lat = slice(-30, -90))
+  #Drop time from "time" dimension (i.e., keep date only)
+  try:
+    t = pd.to_datetime(ds.indexes['time'].to_datetimeindex()).\
+    strftime('%Y-%m-%d')
+  except:
+    t = pd.to_datetime(ds.indexes['time']).strftime('%Y-%m-%d')
+  #Change time dimension with newly formatted date
+  ds['time'] = t
   #Turn data array to data frame
   ds = ds.to_series().reset_index()
-  ds = ds.pivot(index = ['lat', 'lon'], columns = 'time', values = 'tcb')
   #Add attributes to data frame
-  ds = pd.concat([ds.reset_index(),\
-  attrs.loc[attrs.index.repeat(ds.shape[0])]])
+  ds = pd.concat([attrs, ds])
   #Path out
   file_out = os.path.join(folder_out, base_out)
   #Save file
