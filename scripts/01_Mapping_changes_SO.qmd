@@ -294,6 +294,7 @@ all_plots
 We can save the plot as a pdf.
   
 ```{r}
+#| eval: false
 # Saving multi-panel plot
 ggsave(file.path(out_folder, "so_perc_change_map_00s_ccamlr.pdf"), 
        device = "pdf", width = 9, height = 6)
@@ -367,6 +368,6 @@ We can save the plot as a pdf.
 
 ```{r}
 # Saving multi-panel plot
-ggsave(file.path(out_folder, "so_sd_map_50s_ccamlr.pdf"), 
-       device = "pdf", width = 9, height = 6)
+# ggsave(file.path(out_folder, "so_sd_map_50s_ccamlr.pdf"), 
+#        device = "pdf", width = 9, height = 6)
 ```
