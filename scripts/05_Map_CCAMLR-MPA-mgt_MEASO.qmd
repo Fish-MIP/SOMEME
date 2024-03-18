@@ -1,0 +1,72 @@
+---
+title: "Map of CCAMLR MPA Planning Domains and MEASO regions"
+author: "Denisse Fierro Arcos"
+format: gfm
+toc: true
+editor: source
+---
+
+# CCAMLR MPA Planning Domains and MEASO
+In this notebook, we will create a map with the limits of the nine marine protected areas (MPA) planning domains from the Commission for the Conservation of Antarctic and Marine Living Resources (CCAMLR). These [nine domains](https://www.ccamlr.org/en/science/mpa-planning-domains) are used for planning and reporting on the development of MPAs. The limits of the Marine Ecosystem Assessment for the Southern Ocean (MEASO) are also included in the map. [MEASO](https://sokiaq.atlassian.net/wiki/spaces/MEASO/overview) offers standardised regions that researchers can use to assess and report changes in Southern Ocean ecosystems.  
+  
+## Loading libraries
+  
+```{r}
+library(sf)
+library(dplyr)
+library(stringr)
+library(rnaturalearth)
+library(ggplot2)
+library(measoshapes)
+```
+  
+## Loading relevant shapefiles
+  
+```{r}
+#Location of CCAMLR shapefile
+ccamlr_path <- "../../SO_shapefiles/CCAMLR_MPA_Planning_Domains/CCAMLR_MPA_Planning_Domains.shp"
+#Loading shapefile
+ccamlr <- read_sf(ccamlr_path) 
+
+#Loading MEASO regions
+measo <- measo_regions05 |> 
+  #Remove temperate regions
+  filter(str_detect(name, "T$", negate = T)) |> 
+  #Matching CCAMLR CRS
+  st_transform(st_crs(ccamlr))
+
+#Getting Antarctica boundaries
+world <- ne_countries(returnclass = "sf") |> 
+  st_transform(crs = st_crs(ccamlr))
+```
+  
+## Plotting Southern Ocean models 
+  
+```{r}
+ggplot()+
+  #Plot CCAMLR
+  geom_sf(data = ccamlr, aes(fill = Location))+
+  #Choosing colourbling friendly palette
+  scale_fill_brewer(type = "qual", palette = "Paired")+
+  #Overlaying MEASO boundaries as lines
+  geom_sf(data = measo, color = "#999999", fill = NA, linewidth = 0.5, 
+          linetype = "dashed")+
+  #Changing legend title
+  guides(fill = guide_legend(title = "CCAMLR MPA domains"))+
+  #Add world
+  geom_sf(data = world)+
+  #Setting map limits
+  lims(x = c(-5774572.727594968, 5774572.727594968), 
+       y = c(-5774572.727594968, 5774572.727594968))+
+  #Applying B&W theme
+  theme_bw()
+```
+  
+### Saving plot
+  
+```{r}
+#| eval: false
+ggsave("../outputs/ccamlr_measo_map.pdf", device = "pdf", width = 9,
+       height = 7)
+```
+
