@@ -84,6 +84,7 @@ ggplot()+
 ### Saving plot
   
 ```{r}
+#| eval: false
 ggsave("../outputs/fishmip_reg_models_so.pdf", device = "pdf", width = 8,
        height = 7)
 ```
