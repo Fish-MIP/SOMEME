@@ -14,6 +14,7 @@ editor: source
 ```{r}
 library(sf)
 library(dplyr)
+library(stringr)
 library(rnaturalearth)
 library(ggplot2)
 ```
@@ -33,13 +34,50 @@ fishmip_reg <- read_sf(reg_path) |>
   filter(str_detect(region, "Southern Ocean|Prydz|Antarctica|Kerguelen")) |> 
   #South Polar Stereographic projection
   st_transform(crs = 3976)
+
+#Loading Southern Ocean MICE boundaries containing sub regions
+mice_path <- "../../FishMIP_regions/Shapefiles_Regions/Southern-Ocean_MICE/SupportInfo/SouthernOcean_MICE.shp"
+
+#Loading shapefile
+so_mice <- read_sf(mice_path) |> 
+  mutate(subregion = str_c(region, band, "*", sep = " ")) |> 
+  #South Polar Stereographic projection
+  st_transform(crs = 3976)
+
+#Defining KRILLPODYM boundaries (up to 40S)
+krillpodym <- tibble(lon = c(seq(-180, 180, 10), 
+                             sort(seq(-180, 180, 10), decreasing = T)), 
+                     lat = rep(c(-80, -40), each = 37)) |> 
+  #Create sf object
+  st_as_sf(coords = c("lon", "lat"), crs = 4326) |> 
+  #Combine into single geometry
+  summarise(geometry = st_combine(geometry)) |> 
+  #Transform to polygon
+  st_cast("POLYGON") |> 
+  #South Polar Stereographic projection
+  st_transform(crs = 3976) |> 
+  #Add name for plotting
+  mutate(region = "KRILLPODYM")
+
+#Getting Antartica boundaries
+world <- ne_countries(returnclass = "sf") |> 
+  st_transform(crs = 3976)
 ```
 
 **TO DO:** Correct MICE regional boundaries so they reproject correctly.
 
 ```{r}
-fishmip_reg |>
-  ggplot()+
-  geom_sf(aes(fill = region), alpha=0.5)
+ggplot()+
+  geom_sf(data = so_mice, aes(fill = subregion), alpha = 0.3,
+          linetype = "dotted")+  
+  geom_sf(data = fishmip_reg[fishmip_reg$region == "Southern Ocean",],
+          aes(color = region), fill = NA, linewidth = 0.5)+
+  geom_sf(data = krillpodym, aes(color = region), alpha = 0.5)+  
+  geom_sf(data = fishmip_reg[fishmip_reg$region != "Southern Ocean",],
+          aes(fill = region), alpha = 0.5)+
+  geom_sf(data = world)+
+  lims(x = c(-5774572.727594968, 5774572.727594968), 
+       y = c(-5774572.727594968, 5774572.727594968))+
+  theme_bw()
 ```
 
