@@ -1,22 +1,31 @@
----
-title: "Regridding outputs from DBPM and ZOOMS-IPSL"
-author: "Denisse Fierro Arcos"
-date: "2024-03-27"
-format: gfm
-toc: true
-editor: source
----
+Regridding outputs from DBPM and ZOOMS-IPSL
+================
+Denisse Fierro Arcos
+3/27/24
+
+- <a href="#regridding-outputs-from-dbpm-and-zooms-ipsl"
+  id="toc-regridding-outputs-from-dbpm-and-zooms-ipsl">Regridding outputs
+  from DBPM and ZOOMS-IPSL</a>
+  - <a href="#loading-libraries" id="toc-loading-libraries">Loading
+    libraries</a>
+  - <a href="#setting-up-notebook" id="toc-setting-up-notebook">Setting up
+    notebook</a>
+  - <a href="#defining-useful-functions"
+    id="toc-defining-useful-functions">Defining useful functions</a>
+  - <a href="#applying-functions-to-regrid-data"
+    id="toc-applying-functions-to-regrid-data">Applying functions to regrid
+    data</a>
+  - <a href="#comparing-results" id="toc-comparing-results">Comparing
+    results</a>
 
 # Regridding outputs from DBPM and ZOOMS-IPSL
 
-In this notebook, we will regrid outputs from DBPM and ZOOMS-IPSL to match the $1^{\circ}$ grid used by all other FishMIP models.  
-  
-## Loading libraries
-  
-```{r}
-#| warning: false
-#| output: false
+In this notebook, we will regrid outputs from DBPM and ZOOMS-IPSL to
+match the $1^{\circ}$ grid used by all other FishMIP models.
 
+## Loading libraries
+
+``` r
 #Data wrangling
 library(tidyverse)
 library(data.table)
@@ -26,9 +35,10 @@ library(terra)
 
 ## Setting up notebook
 
-We will define the folders where inputs are kept, and where outputs should be saved.
+We will define the folders where inputs are kept, and where outputs
+should be saved.
 
-```{r}
+``` r
 #Base folder for project
 base_folder <- "/rd/gem/public/fishmip/SOMEME/"
 
@@ -40,14 +50,18 @@ reg_files <- list.files(base_folder, full.names = T,
                         recursive = T) |> 
   str_subset("dbpm|zoomss_ipsl")
 ```
-  
-## Defining useful functions 
+
+## Defining useful functions
+
 We will define three functions:  
-1. `csv_to_ras` loads a csv file from a path and transforms into a raster  
-2. `ras_to_df` takes a raster and transforms it to a data frame matching the structure of original file  
-3. `csv_to_reg_df` applies the two functions above, it will also regrid a raster, and save it if a file path is provided.  
-   
-```{r}
+1. `csv_to_ras` loads a csv file from a path and transforms into a
+raster  
+2. `ras_to_df` takes a raster and transforms it to a data frame matching
+the structure of original file  
+3. `csv_to_reg_df` applies the two functions above, it will also regrid
+a raster, and save it if a file path is provided.
+
+``` r
 csv_to_ras <- function(file_path){
   #Read the csv file
   df <- read_csv(file_path)
@@ -111,11 +125,10 @@ csv_to_reg_df <- function(file_path, target_grid, method = "bilinear",
   return(reg_df)
 }
 ```
-  
+
 ## Applying functions to regrid data
-  
-```{r}
-#| eval: false
+
+``` r
 #Looping through each file
 for(f in reg_files){
   #Creating new file path to save files
@@ -124,30 +137,47 @@ for(f in reg_files){
   reg <- csv_to_reg_df(f, target_grid, path_out = f_out)
   }
 ```
-  
-```{r}
-#| echo: false
-reg <- read_csv("/rd/gem/public/fishmip/SOMEME//regridded_zoomss_ipsl-cm6a-lr_nobasd_ssp585_nat_default_tcb_southern-ocean_annual_2015_2100.csv")
-f <- "/rd/gem/public/fishmip/SOMEME//zoomss_ipsl-cm6a-lr_nobasd_ssp585_nat_default_tcb_southern-ocean_annual_2015_2100.csv"
-```
 
-  
+    Rows: 1217330 Columns: 6
+    ── Column specification ────────────────────────────────────────────────────────
+    Delimiter: ","
+    chr  (2): long_name, units
+    dbl  (3): lon, lat, tcb
+    date (1): time
+
+    ℹ Use `spec()` to retrieve the full column specification for this data.
+    ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+
 ## Comparing results
-We will plot the regridded data first.  
-  
-```{r}
+
+We will plot the regridded data first.
+
+``` r
 reg |> 
   filter(time == max(time)) |> 
   ggplot(aes(lon, lat, fill = tcb))+
   geom_tile()
 ```
 
-Now, we will load the original file and plot it below.  
-  
-```{r}
+![](02_Regridding_data_files/figure-commonmark/unnamed-chunk-6-1.png)
+
+Now, we will load the original file and plot it below.
+
+``` r
 read_csv(f) |> 
   filter(time == max(time, na.rm = T)) |> 
   ggplot(aes(lon, lat, fill = tcb))+
   geom_tile()
 ```
 
+    Rows: 1857601 Columns: 6
+    ── Column specification ────────────────────────────────────────────────────────
+    Delimiter: ","
+    chr  (2): long_name, units
+    dbl  (3): lat, lon, tcb
+    date (1): time
+
+    ℹ Use `spec()` to retrieve the full column specification for this data.
+    ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+
+![](02_Regridding_data_files/figure-commonmark/unnamed-chunk-7-1.png)
