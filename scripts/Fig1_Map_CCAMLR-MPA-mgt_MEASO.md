@@ -85,7 +85,7 @@ world <- ne_countries(returnclass = "sf") |>
 ## Plotting Southern Ocean models
 
 ``` r
-ggplot()+
+p1 <- ggplot()+
   #Plot CCAMLR
   geom_sf(data = ccamlr, aes(fill = Location))+
   #Choosing colourbling friendly palette
@@ -102,13 +102,19 @@ ggplot()+
        y = c(-5774572.727594968, 5774572.727594968))+
   #Applying B&W theme
   theme_bw()
+
+p1
 ```
 
-![](05_Map_CCAMLR-MPA-mgt_MEASO_files/figure-commonmark/unnamed-chunk-3-1.png)
+![](Fig1_Map_CCAMLR-MPA-mgt_MEASO_files/figure-commonmark/unnamed-chunk-3-1.png)
 
 ### Saving plot
 
 ``` r
-ggsave("../outputs/ccamlr_measo_map.pdf", device = "pdf", width = 9,
+#Saving plot as image file
+ggsave("../outputs/ccamlr_measo_map.pdf", p1, device = "pdf", width = 9,
        height = 7)
+
+#Saving plot as R object for further processing
+saveRDS(p1, "../outputs/ccamlr_measo_map.rds")
 ```
