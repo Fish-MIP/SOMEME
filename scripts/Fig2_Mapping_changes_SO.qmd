@@ -72,7 +72,7 @@ global_files <- list.files(base_folder, full.names = T, recursive = T) |>
   str_subset("apecosm_ipsl|boats|dbpm_ipsl|ecotroph|macroecological|zoomss") |> 
   str_subset("nat_default") |> 
   #Removing "picontrol" experiment
-  str_subset("picontrol", negate = T)
+  str_subset("picontrol|regridded", negate = T)
 ```
   
 ## Calculating percentage change in fish biomass estimates from global FishMIP models
@@ -103,13 +103,16 @@ for(f in global_files){
     group_by(lat, lon, group) |> 
     summarise(mean_bio = mean(tcb, na.rm = T)) |> 
     ungroup() |> 
-    #Add scenario to data frame
-    mutate(scenario = scenario,
-           #Add name of model
-           mem = mem) |> 
+    #Add name of model
+    mutate(mem = mem) |> 
     #Split ecosystem model name from ESM name
     separate_wider_delim(mem, delim = "_", names = c("mem", "esm"))
     
+  if(str_detect(mem, "dbpm|zoomss_ipsl")){
+    df <- df |> 
+      #Move grid by 0.5 degrees in DBPM and ZOOMSS datasets
+      mutate(lon = lon+0.5)
+  }
   
   #Path to save file
   f_out <- file.path(out_folder,
@@ -132,8 +135,6 @@ global_files <- list.files(out_folder, "gridded_mean",
 #Getting a list of models
 members <- basename(global_files) |> 
   str_extract("^(.*)_gridded", group = 1) |> 
-  #Excluding DBPM and ZOOMS IPSL because of different grid
-  str_subset("dbpm|zoomss_ipsl", negate = T) |> 
   unique()
 
 #Loading data for each model
@@ -302,5 +303,54 @@ We can save the plot as a pdf.
 # Saving multi-panel plot
 ggsave(file.path(out_folder, "so_perc_change_map_00s_ccamlr.pdf"), 
        device = "pdf", width = 9, height = 5)
+```
+  
+We can also save individual plots, but we will change their layout a little before saving them as images and `R` objects.  
+  
+```{r}
+#| eval: false
+#Defining ggplot recipe to standardise legend
+leg_gg <- list(
+  guides(fill = guide_colorbar(title = "% change in total consumer biomass",
+                               title.position = "left", title.hjust = 0.5, 
+                               barheight = 15)),
+  theme(legend.position = "right", legend.title = element_text(angle = 90), 
+        legend.text = element_text(angle = 90, hjust = 0.5, vjust = 0.25),
+        plot.title = element_blank(), 
+        panel.border = element_rect(colour = "grey20")))
+
+#Applying ggplot recipe and saving plots
+p00_126 <- p00_126+
+  leg_gg
+
+#Get legend
+leg_vert <- get_legend(p00_126)
+
+#Removing legend before saving
+p00_126 <- p00_126+
+  theme(legend.position = "none")
+
+#Saving plot as image
+ggsave(file.path(out_folder, "so_perc_change_map_00-126_ccamlr.pdf"), p00_126,
+       device = "pdf")
+#Saving plot as r object for further processing
+saveRDS(plot_grid(p00_126), 
+        file.path(out_folder, "so_perc_change_map_00-126_ccamlr.rds"))
+
+#Saving legend
+saveRDS(leg_vert, 
+        file.path(out_folder, "so_perc_change_map_00s_ccamlr_leg.rds"))
+
+#Applying recipe
+p00_585 <- p00_585+
+  leg_gg+
+  theme(legend.position = "none", axis.text.y = element_text())
+
+#Saving plot as image
+ggsave(file.path(out_folder, "so_perc_change_map_00-585_ccamlr.pdf"), p00_585,
+       device = "pdf")
+#Saving plot as r object for further processing
+saveRDS(plot_grid(p00_585), 
+        file.path(out_folder, "so_perc_change_map_00-585_ccamlr.rds"))
 ```
   
