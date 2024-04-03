@@ -111,7 +111,7 @@ p1
 ### Saving plot
 
 ``` r
-#Saving plot as image file
+# Saving plot as image file
 ggsave("../outputs/ccamlr_measo_map.pdf", p1, device = "pdf", width = 9,
        height = 7)
 
