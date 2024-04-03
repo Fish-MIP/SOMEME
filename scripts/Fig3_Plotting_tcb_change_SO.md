@@ -106,8 +106,9 @@ we will calculate an ensemble mean and inter model standard deviation.
 
 ``` r
 #Listing all relevant files to calculate biomass projections
-ensemble_data <- list.files(out_folder, pattern = "_perc_bio_change_data_map.csv", 
-                        full.names = T) |> 
+ensemble_data <- list.files(out_folder, 
+                            pattern = "_perc_bio_change_data_map.csv", 
+                            full.names = T) |> 
   #Loading all files
   map_df(~fread(.)) |> 
   #Calculations performed at grid cell level
@@ -211,11 +212,37 @@ all_plots <- plot_grid(plot_grid(ssp126, ssp585, ncol = 1, nrow = 2,
 all_plots
 ```
 
-![](03_Plotting_tcb_change_SO_files/figure-commonmark/unnamed-chunk-6-1.png)
+![](Fig3_Plotting_tcb_change_SO_files/figure-commonmark/unnamed-chunk-6-1.png)
 
 Saving plot as pdf.
 
 ``` r
 ggsave(file.path(out_folder, "so_boxplots_00s_ccamlr.pdf"), 
        device = "pdf", width = 9, height = 7)
+
+#Saving plot as R object for further processing
+saveRDS(all_plots, file.path(out_folder, "so_boxplots_00s_ccamlr.rds"))
+```
+
+We can also save individual plots, but we will change their layout a
+little before saving them as images and `R` objects.
+
+``` r
+#Removing title and adding legend
+ssp126 <- ssp126+
+  theme(legend.position = "right", plot.title = element_blank())
+#Saving plot as image
+ggsave(file.path(out_folder, "so_boxplots_00-126_ccamlr.pdf"), ssp126,
+       device = "pdf")
+#Saving plot as r object for further processing
+saveRDS(ssp126, file.path(out_folder, "so_boxplots_00-126_ccamlr.rds"))
+
+#Applying recipe
+ssp585 <- ssp585+
+  theme(legend.position = "right", plot.title = element_blank())
+#Saving plot as image
+ggsave(file.path(out_folder, "so_boxplots_00-585_ccamlr.pdf"), ssp585,
+       device = "pdf")
+#Saving plot as r object for further processing
+saveRDS(ssp585, file.path(out_folder, "so_boxplots_00-585_ccamlr.rds"))
 ```

@@ -4,15 +4,15 @@ author: "Denisse Fierro Arcos"
 date: "2024-02-19"
 format: gfm
 toc: true
-editor: visual
+editor: source
 ---
 
 # Changes in total consumer biomass in the Southern Ocean over time
 
-In this notebook, we will use all FishMIP global models to calculate the mean ensemble percentage change in total consumer biomass (TCB) in the Southern Ocean for the decade ending in 2100. The reference period for this calculation is 2005-2014.  
-  
+In this notebook, we will use all FishMIP global models to calculate the mean ensemble percentage change in total consumer biomass (TCB) in the Southern Ocean for the decade ending in 2100. The reference period for this calculation is 2005-2014.
+
 ## Loading libraries
-  
+
 ```{r}
 #| warning: false
 #| output: false
@@ -25,10 +25,11 @@ library(cowplot)
 #Color palettes
 library(RColorBrewer)
 ```
-  
+
 ## Setting up notebook
+
 We will define the folders where inputs are kept, and where outputs should be saved.
-  
+
 ```{r}
 #Base folder for project
 base_folder <- "/rd/gem/public/fishmip/SOMEME/"
@@ -39,9 +40,9 @@ if(!dir.exists(out_folder)){
   dir.create(out_folder)
 }
 ```
-  
+
 ## Loading CCAMLR MPA Planning Domains
-  
+
 ```{r}
 #CCAMLR mask
 ccamlr_mask <- read_csv("../outputs/ccamlr_mpa_planning_1deg.csv") |> 
@@ -58,16 +59,17 @@ ccamlr_mask <- read_csv("../outputs/ccamlr_mpa_planning_1deg.csv") |>
          Location = factor(Location)) |> 
   #Remove area column as it is not needed
   select(!area_m)
-  
 ```
-  
+
 ## Loading percentage change in TCB data
-In [notebook 2](https://github.com/Fish-MIP/SOMEME/blob/main/scripts/02_Mapping_changes_SO.md), we calculated the mean percentage change in TCB per FishMIP model. Here, we will calculate an ensemble mean and inter model standard deviation.  
-  
+
+In [notebook 2](https://github.com/Fish-MIP/SOMEME/blob/main/scripts/02_Mapping_changes_SO.md), we calculated the mean percentage change in TCB per FishMIP model. Here, we will calculate an ensemble mean and inter model standard deviation.
+
 ```{r}
 #Listing all relevant files to calculate biomass projections
-ensemble_data <- list.files(out_folder, pattern = "_perc_bio_change_data_map.csv", 
-                        full.names = T) |> 
+ensemble_data <- list.files(out_folder, 
+                            pattern = "_perc_bio_change_data_map.csv", 
+                            full.names = T) |> 
   #Loading all files
   map_df(~fread(.)) |> 
   #Calculations performed at grid cell level
@@ -87,12 +89,12 @@ ensemble_data <- list.files(out_folder, pattern = "_perc_bio_change_data_map.csv
   mutate(ssp126_sd = sd(rel_change_mean00_ssp126_mean, na.rm = T),
          ssp585_sd = sd(rel_change_mean00_ssp585_mean, na.rm = T))|> 
   ungroup()
-  
 ```
-  
+
 ## Inter model variability plot
+
 We will describe the base plot format and then apply it to both emissions scenarios: SSP1-2.6 and SSP5-8.5
-  
+
 ```{r}
 base_gg <- list(scale_fill_stepsn(colors = brewer.pal(7, "Purples"),
                                   n.breaks = 9, limits = c(0, 40),
@@ -114,9 +116,9 @@ base_gg <- list(scale_fill_stepsn(colors = brewer.pal(7, "Purples"),
                       legend.position = "none", 
                       plot.title = element_text(hjust = 0.5)))
 ```
-  
-Applying plot template to each scenario before creating a composite figure.  
-  
+
+Applying plot template to each scenario before creating a composite figure.
+
 ```{r}
 #SSP1-2.6
 ssp126 <- ensemble_data |> 
@@ -165,12 +167,37 @@ all_plots <- plot_grid(plot_grid(ssp126, ssp585, ncol = 1, nrow = 2,
 #Check final map
 all_plots
 ```
-  
-Saving plot as pdf.  
-  
+
+Saving plot as pdf.
+
 ```{r}
 #| eval: false
 ggsave(file.path(out_folder, "so_boxplots_00s_ccamlr.pdf"), 
        device = "pdf", width = 9, height = 7)
-```
 
+#Saving plot as R object for further processing
+saveRDS(all_plots, file.path(out_folder, "so_boxplots_00s_ccamlr.rds"))
+```
+  
+We can also save individual plots, but we will change their layout a little before saving them as images and `R` objects.  
+  
+```{r}
+#| eval: false
+#Removing title and adding legend
+ssp126 <- ssp126+
+  theme(legend.position = "right", plot.title = element_blank())
+#Saving plot as image
+ggsave(file.path(out_folder, "so_boxplots_00-126_ccamlr.pdf"), ssp126,
+       device = "pdf")
+#Saving plot as r object for further processing
+saveRDS(ssp126, file.path(out_folder, "so_boxplots_00-126_ccamlr.rds"))
+
+#Applying recipe
+ssp585 <- ssp585+
+  theme(legend.position = "right", plot.title = element_blank())
+#Saving plot as image
+ggsave(file.path(out_folder, "so_boxplots_00-585_ccamlr.pdf"), ssp585,
+       device = "pdf")
+#Saving plot as r object for further processing
+saveRDS(ssp585, file.path(out_folder, "so_boxplots_00-585_ccamlr.rds"))
+```
