@@ -31,9 +31,10 @@ reg_path <- "../../FishMIP_regions/Outputs/FishMIP_regional_models/FishMIP_regio
 #Loading shapefile
 fishmip_reg <- read_sf(reg_path) |> 
   #Keeping Southern Ocean regional models
-  filter(str_detect(region, "Southern Ocean|Prydz|Antarctica|Kerguelen")) |> 
+  filter(str_detect(region, "Southern Ocean|Prydz|Antarctica|Kerguelen|Ross")) |> 
   #Add colours for each region
-  mutate(col = c("#ee99aa", "#0077bb", "#004488", "#994455", "#000000")) |> 
+  mutate(col = c("#225522", "#ee7733", "#cc3311", "#ee99aa",
+                 "#0077bb", "#004488", "#994455", "#000000")) |> 
   #South Polar Stereographic projection
   st_transform(crs = 3976)
 
@@ -64,16 +65,19 @@ ggplot()+
           linetype = "dotted")+
   scale_fill_manual(values = so_mice$fill)+
   geom_sf(data = fishmip_reg[fishmip_reg$region == "Southern Ocean",],
-          aes(color = region), fill = NA, linewidth = 0.5)+
+          aes(color = region), fill = NA, linewidth = 0.6)+
   geom_sf(data = fishmip_reg[fishmip_reg$region != "Southern Ocean",],
           aes(color = region), linewidth = 0.5, alpha = 0.3)+
   guides(color = guide_legend(title = "Regional model name", order = 1))+
   scale_color_manual(values = fishmip_reg$col,
-                     labels = c("East Antarctica",
-                                  "Kerguelen EwE",
-                                  "Kerguelen Mizer",
-                                  "Prydz Bay",
-                                  "Southern Ocean MICE / KRILLPODYM"))+
+                     labels = c("East Antarctica Atlantis",
+                                "East Antarctica EwE",
+                                "Kerguelen EwE",
+                                "Kerguelen Mizer",
+                                "Kerguelen Plateau EwE",
+                                "Prydz Bay",
+                                "Ross Sea MTBM",
+                                "Southern Ocean MICE / KRILLPODYM"))+
   guides(fill = guide_legend(title = "MICE subregions"))+
   geom_sf(data = world)+
   lims(x = c(-5774572.727594968, 5774572.727594968), 
