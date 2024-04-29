@@ -71,9 +71,6 @@ reg_path <- "../../FishMIP_regions/Outputs/FishMIP_regional_models/FishMIP_regio
 fishmip_reg <- read_sf(reg_path) |> 
   #Keeping Southern Ocean regional models
   filter(str_detect(region, "Southern Ocean|Prydz|Antarctica|Kerguelen|Ross")) |> 
-  #Add colours for each region
-  mutate(col = c("#225522", "#ee7733", "#cc3311", "#ee99aa",
-                 "#0077bb", "#004488", "#994455", "#000000")) |> 
   #South Polar Stereographic projection
   st_transform(crs = 3976)
 
@@ -90,7 +87,15 @@ so_mice <- read_sf(mice_path) |>
   #South Polar Stereographic projection
   st_transform(crs = 3976)
 
-#Getting Antartica boundaries
+#Adding SOTS and CCAMLR 4-83 to map
+fishmip_reg <- fishmip_reg |> 
+  bind_rows(read_sf("../data/SOTS/clean_SOTS_region.shp")) |> 
+  bind_rows(read_sf("../data/CCAMLR_48-3/clean_CCAMLR_48-3.shp")) |> 
+  #Add colours for each region
+  mutate(col = c("#225522", "#ee7733", "#cc3311", "#ee99aa", "#009988",
+                 "#0077bb", "#004488", "#994455", "#000000")) 
+
+#Getting Antarctica boundaries
 world <- ne_countries(returnclass = "sf") |> 
   st_transform(crs = 3976)
 ```
@@ -98,7 +103,7 @@ world <- ne_countries(returnclass = "sf") |>
 ## Plotting Southern Ocean models
 
 ``` r
-ggplot()+
+p <- ggplot()+
   #Add MICE subregions - Colouring by subregion
   geom_sf(data = so_mice, aes(fill = subregion), alpha = 0.3,
           linetype = "dotted")+
@@ -109,19 +114,22 @@ ggplot()+
           aes(color = region), linewidth = 0.5, alpha = 0.3)+
   guides(color = guide_legend(title = "Regional model name", order = 1))+
   scale_color_manual(values = fishmip_reg$col,
-                     labels = c("East Antarctica Atlantis",
+                     labels = c("CCAMLR 48.3 EwE",
+                                "East Antarctica Atlantis",
                                 "East Antarctica EwE",
                                 "Kerguelen EwE",
                                 "Kerguelen Mizer",
-                                "Kerguelen Plateau EwE",
-                                "Prydz Bay",
-                                "Ross Sea MTBM",
+                                "Prydz Bay EwE & Mizer",
+                                "Ross Sea MTBM EwE",
+                                "SOTS Mizer",
                                 "Southern Ocean MICE / KRILLPODYM"))+
   guides(fill = guide_legend(title = "MICE subregions"))+
   geom_sf(data = world)+
   lims(x = c(-5774572.727594968, 5774572.727594968), 
        y = c(-5774572.727594968, 5774572.727594968))+
   theme_bw()
+
+p
 ```
 
 ![](Fig4_FishMIP_SO_models_files/figure-commonmark/unnamed-chunk-3-1.png)
